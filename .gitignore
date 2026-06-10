@@ -1,3 +1,11 @@
+# JobFindr output
+results/
+data/
+resume.txt
+
+# Node worker
+worker/node_modules/
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[codz]

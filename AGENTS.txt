@@ -1,0 +1,59 @@
+I want to build a job searching ai agent. I want it to be super thorough. For example, I give it a description, location, etc and it would search for job openings with those specifications. The difference between this and other job boards is that some companies don't post their listings on job boards, and if I want to scrape them, most of them have anti-bot protection. 
+
+Specifically I want to do the ATS Direct Discovery. Instead of scraping company.com/careers, you scrape the underlying ATS API endpoints. Greenhouse, Lever, and Ashby have public, unauthenticated APIs for their boards that rarely have strict bot blocking because they want listings to be indexed.
+
+I want to use playwright-stealth or puppeteer-extra-plugin-stealth to bypass cloudflare.
+
+I also plan to add Smartproxy (Decodo) to add a proxy layer to avoid being banned
+
+I want this setup:
+Scraping Worker (Node.js + puppeteer-extra-plugin-stealth): A lightweight script that takes a URL, spins up a stealth browser, grabs the HTML/Network logs, and returns it.
+
+Agent Brain (Python): The main application that coordinates the search, calls the Node worker to get the data, and uses an LLM to parse out the jobs.
+
+Finally here is the plan:
+Step 1: The Discovery Phase (LLM-driven)
+
+If a user asks for "Software Engineer roles in Austin, TX at Series A startups," the agent shouldn't just guess URLs.
+
+    Use an LLM or an API tool to generate a list of target companies matching that exact profile.
+
+    Have the agent use Google Search automation (via a stealth search scraper) to find the exact career page URL (e.g., querying site:greenhouse.io "Company Name" or "Company Name" careers).
+
+Step 2: The Execution Phase (Stealth Scraping)
+
+Once the agent has the career page URL, it executes the Playwright script using Fingerprint Randomization:
+
+    Randomize scroll speeds, mouse movements, and delays between clicks.
+
+    If it encounters a Cloudflare "Waiting Room" turnstile, a stealth plugin can often pass it automatically if your IP reputation is clean.
+
+Step 3: The Parsing Phase (Structured Data Extraction)
+
+Career pages are structured terribly. Don't write custom CSS selectors for every website—that will break constantly.
+
+    The LLM Parser: Extract the raw HTML or inner text of the job listings page. Pass that text block to a cheap, fast LLM (like GPT-4o-mini or Claude 3.5 Haiku) with a strict schema constraint (JSON Mode/Structured Outputs).
+
+    The Prompt: "Extract all job titles, locations, application URLs, and team departments from this text. Return as a JSON array."
+
+4. Bypassing the Hardest Targets (Workday & Enterprise)
+
+Workday is notoriously painful to scrape. However, it has a backdoor.
+
+When you load a Workday career portal, it makes an internal API request to fetch the jobs dynamically.
+
+    Open the page in Playwright.
+
+    Use Playwright's network interception (page.on('response', ...)).
+
+    Look for network responses containing JSON data payload with keys like jobPostings.
+
+    Instead of parsing the messy HTML, grab that pure, beautifully structured JSON payload directly from the network traffic.
+
+5. Potential Pitfalls to Design For
+
+    Honeypots: Some advanced anti-bot systems inject invisible links into the HTML. If your scraper clicks them, it's instantly banned. Ensure your agent only interacts with elements that are explicitly visible on the page.
+
+    Rate Limiting: Do not multithread hundreds of requests to the same target domain simultaneously. Space them out, rotate user agents, and behave like a human taking their time to read a page.
+
+    Captchas: If a site forces a hard CAPTCHA, you can integrate API-based solver services (like 2Captcha or Anti-Captcha) directly into your Playwright pipeline, though aiming for high IP reputation via residential proxies is a cleaner first defense.
